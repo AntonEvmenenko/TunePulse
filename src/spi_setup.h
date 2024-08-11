@@ -6,18 +6,13 @@
 #include "stm32g4xx_ll_gpio.h"
 #include "stm32g4xx_ll_spi.h"
 
-typedef void (*SPI_RX_Callback)(uint16_t);
-typedef void (*SPI_TX_Callback)();
-
 namespace SPI1N {
 
-SPI_RX_Callback RxCallback = nullptr;
-SPI_TX_Callback TxCallback = nullptr;
+volatile uint16_t tx_buffer[] = {0x8020, 0, 0};
+volatile uint16_t rx_buffer[] = {0, 0, 0};
 
-void SetCallbacks(SPI_RX_Callback RxCallback_, SPI_TX_Callback TxCallback_) {
-    RxCallback = RxCallback_;
-    TxCallback = TxCallback_;
-}
+volatile uint8_t tx_buffer_index = 0;
+volatile uint8_t rx_buffer_index = 0;
 
 void Init() {
     LL_SPI_InitTypeDef SPI_InitStruct = {0};
@@ -28,10 +23,10 @@ void Init() {
     SPI_InitStruct.TransferDirection = LL_SPI_FULL_DUPLEX;
     SPI_InitStruct.Mode = LL_SPI_MODE_MASTER;
     SPI_InitStruct.DataWidth = LL_SPI_DATAWIDTH_16BIT;
-    SPI_InitStruct.ClockPolarity = LL_SPI_POLARITY_LOW;
-    SPI_InitStruct.ClockPhase = LL_SPI_PHASE_2EDGE;
+    SPI_InitStruct.ClockPolarity = LL_SPI_POLARITY_LOW;  // Correct
+    SPI_InitStruct.ClockPhase = LL_SPI_PHASE_2EDGE;      // Correct
     SPI_InitStruct.NSS = LL_SPI_NSS_SOFT;
-    SPI_InitStruct.BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV4;
+    SPI_InitStruct.BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV64;
     SPI_InitStruct.BitOrder = LL_SPI_MSB_FIRST;
     SPI_InitStruct.CRCCalculation = LL_SPI_CRCCALCULATION_DISABLE;
     SPI_InitStruct.CRCPoly = 7;
@@ -41,7 +36,7 @@ void Init() {
 
     // Enable SPI Interrupts
     // LL_SPI_EnableIT_RXNE(SPI1);
-    LL_SPI_EnableIT_TXE(SPI1);
+    // LL_SPI_EnableIT_TXE(SPI1);
     // LL_SPI_EnableIT_ERR(SPI1);
 }
 
@@ -54,8 +49,12 @@ void Start() {
     LL_SPI_Enable(SPI1);
 }
 
-void TransmitData16(uint16_t data) {
-    LL_SPI_TransmitData16(SPI1, data);
+void StartTransfer() {
+    rx_buffer_index = 0;
+    tx_buffer_index = 0;
+    ChipSelect(true);
+    LL_SPI_EnableIT_RXNE(SPI1);
+    LL_SPI_EnableIT_TXE(SPI1);
 }
 
 }  // namespace SPI1N
@@ -63,20 +62,29 @@ void TransmitData16(uint16_t data) {
 extern "C" void SPI1_IRQHandler(void) {
     /* Check RXNE flag value in ISR register */
     if (LL_SPI_IsActiveFlag_RXNE(SPI1)) {
-        if (SPI1N::RxCallback) {
-            SPI1N::RxCallback(LL_SPI_ReceiveData16(SPI1));
-        }
+        SPI1N::rx_buffer[SPI1N::rx_buffer_index++] = LL_SPI_ReceiveData16(SPI1);
     }
     /* Check RXNE flag value in ISR register */
     else if (LL_SPI_IsActiveFlag_TXE(SPI1)) {
-        if (SPI1N::TxCallback) {
-            SPI1N::TxCallback();
+        if (SPI1N::tx_buffer_index == 1) {
+            // for (int i = 0; i < 110; i++) {
+            // }
         }
+        if (SPI1N::tx_buffer_index == 2) {
+            while (LL_SPI_IsActiveFlag_BSY(SPI1));
+            LL_SPI_DisableIT_TXE(SPI1);
+            LL_SPI_DisableIT_RXNE(SPI1);
+            SPI1N::ChipSelect(false);
+            return;
+        }
+        LL_SPI_TransmitData16(SPI1, SPI1N::tx_buffer[SPI1N::tx_buffer_index++]);
     }
     /* Check STOP flag value in ISR register */
-    // else if (LL_SPI_IsActiveFlag_OVR(SPI1)) {
-    //     // Call Error function
-    // }
+    /*
+    else if (LL_SPI_IsActiveFlag_OVR(SPI1)) {
+        // Call Error function
+    }
+    */
 }
 
 #endif  // SPI_SETUP_H
