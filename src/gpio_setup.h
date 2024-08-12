@@ -49,8 +49,6 @@ void IO_Init() {
     // PA7   ------> SPI1_MOSI
     // PC4   ------> SPI1_CS
 
-#ifndef ARDUINO_ENCODER
-
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
     GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
@@ -74,8 +72,6 @@ void IO_Init() {
 
     GPIO_InitStruct.Pin = LL_GPIO_PIN_4;
     LL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-#endif  // ARDUINO_ENCODER
 
     /////////////////////////// GENERAL PURPOSE GPIO //////////////////////////
 
