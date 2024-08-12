@@ -17,6 +17,8 @@
 
 // COM PORT MUST BE OPENED TO RUN PROGRAM !!!!!!!!!!!!!!!!!
 
+Encoder encoder;
+
 uint32_t angle;
 
 void setup() {
@@ -42,6 +44,6 @@ void setup() {
 }
 
 void loop() {
-    angle = SPI1_rx_buffer[1] << 17;
-    SPI1_StartTransfer();
+    encoder.tick();
+    angle = encoder.get_output();
 }
